@@ -1,9 +1,5 @@
 #define BOOST_LOG_DYN_LINK 1
 
-#include <boost/archive/iterators/base64_from_binary.hpp>
-#include <boost/archive/iterators/insert_linebreaks.hpp>
-#include <boost/archive/iterators/ostream_iterator.hpp>
-#include <boost/archive/iterators/transform_width.hpp>
 #include <boost/asio/connect.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/ssl/error.hpp>
@@ -16,6 +12,9 @@
 #include <boost/json/src.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/throw_exception.hpp>
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
 #include <cstdlib>
 #include <curl/curl.h>
 #include <fmt/core.h>
@@ -27,7 +26,13 @@
 #include <stdexcept>
 #include <string>
 
+#include <boost/endian/arithmetic.hpp>
+#include <boost/cstdint.hpp>
+#include <iomanip>
+
 using StringDict = std::map<std::string, std::string>;
+using BytesUUID = unsigned char[16];
+using BytesBigEndianInt24 = unsigned char[3];
 
 int EscapeUrlParameter(const char* Parameter, std::string* Result ) {
 	// Temporary solution before more secure method is found
@@ -156,17 +161,44 @@ gpgme_error_t LoadToken(gpgme_ctx_t* Context, const char* Filename, gpgme_data_t
 	return GPG_ERR_NO_ERROR;
 }
 
-// https://github.com/sqlcipher/sqlcipher
+void SerializeUUID(BytesUUID* Result) {
+	boost::uuids::uuid UUID = boost::uuids::random_generator()();
+    memcpy(*Result, &UUID, 16);
+}
 
+std::string DeserializeUUID(BytesUUID *Input) {
+	boost::uuids::uuid UUID;
+	memcpy(&UUID, *Input, 16);
+	return to_string(UUID);
+}
+
+void SerializeInt24(boost::endian::big_uint32_t* Int, BytesBigEndianInt24* Result) {
+	(*Result)[2] = ((*Int) >> 0) & 0xFF;
+	(*Result)[1] = ((*Int) >> 8) & 0xFF;
+	(*Result)[0] = ((*Int) >> 16) & 0xFF;
+}
+
+boost::endian::big_uint32_t DeserializeInt24(BytesBigEndianInt24* Bytes) {
+	boost::endian::big_uint32_t Result;
+	Result = ((boost::endian::big_uint32_t)((*Bytes)[0]) << 16) | ((boost::endian::big_uint32_t)((*Bytes)[1]) << 8) | ((boost::endian::big_uint32_t)((*Bytes)[2]) << 0);
+	return Result;
+}
+
+
+// https://github.com/sqlcipher/sqlcipher
 int main() {
+	boost::endian::big_uint32_t n = 14045266;
+	BytesBigEndianInt24 bytes;
+	SerializeInt24(&n, &bytes);
+	BOOST_LOG_TRIVIAL(error) << DeserializeInt24(&bytes);
 // 	boost::json::value r;
 // 	VkApiRequest("account.getProfileInfo", StringDict{ { "id", "hello world!=&" }, { "foo", "bar" }, }, &r);
 // 	std::cout << r << std::endl;
-	gpgme_ctx_t GPGContext;
-	gpgme_error_t GPGError;
-	GPGError = SetContext(&GPGContext);
-	gpgme_data_t token;
-	GPGError = LoadToken(&GPGContext, "tests/encrypted_token.asc", &token);
-	HandleGpgError(&GPGError);
+// 	gpgme_ctx_t GPGContext;
+// 	gpgme_error_t GPGError;
+// 	GPGError = SetContext(&GPGContext);
+// 	gpgme_data_t token;
+// 	GPGError = LoadToken(&GPGContext, "tests/encrypted_token.asc", &token);
+// 	HandleGpgError(&GPGError);
 	return 0;
 }
