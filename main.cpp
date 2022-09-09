@@ -10,18 +10,24 @@
 #include <string.h>
 #include <iostream>
 #include <iomanip>
+#include <QtSql>
 
-// -----=====| GPG BEGIN |=====-----
+//Keyring MainKeyring = Keyring();
 
-// Used: 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112
+gpgme_error_t ExtPasswordCallBack(void *hook, const char *uid_hint, const char *passphrase_info, int prev_was_bad, int fd) {
+    return 0;
+}
+
 
 long Hook;
+
+
 
 class GpgObject {
 public:
     GpgObject(const char* Signer) {
         this->SetContext(Signer);
-        this->Keys = new Keyring(&this->Context);
+        this->Keys = new Keyring();
     }
 
     ~GpgObject() {
@@ -30,7 +36,10 @@ public:
     }
 
 
-
+    void SetPinentry(gpgme_passphrase_cb_t *CallBackFunc) {
+        gpgme_set_passphrase_cb(this->Context, *CallBackFunc, &Hook);
+        gpgme_set_pinentry_mode(this->Context, GPGME_PINENTRY_MODE_LOOPBACK );
+    }
     gpgme_error_t PasswordCallBack(void *hook, const char *uid_hint, const char *passphrase_info, int prev_was_bad, int fd) {
         qDebug() << (long)hook;
         qDebug() << uid_hint;
@@ -79,6 +88,7 @@ private:
         return GPG_ERR_NO_ERROR;
     }
 
+
     void SetContext(const char* Signer) {
         gpgme_check_version(NULL);
         this->Error = gpgme_new(&(this->Context));
@@ -95,9 +105,7 @@ private:
         if (this->Error) { this->ExplainError(110); return; }
         this->Error = gpgme_signers_add(this->Context, KeyObject);
         if (this->Error) { this->ExplainError(111); return; }
-        gpgme_passphrase_cb_t pcb = ExtPasswordCallBack;
-        gpgme_set_passphrase_cb(this->Context, pcb, &Hook);
-        gpgme_set_pinentry_mode(this->Context, GPGME_PINENTRY_MODE_LOOPBACK );
+
     }
 
     void ExplainError(quint16 Operation) {
@@ -142,18 +150,11 @@ private:
 
 };
 
-GpgObject *k;
-
-gpgme_error_t ExtPasswordCallBack(void *hook, const char *uid_hint, const char *passphrase_info, int prev_was_bad, int fd) {
-    return k->PasswordCallBack(hook, uid_hint, passphrase_info, prev_was_bad, fd);
-}
-
-k = new GpgObject("A1662AA073AE46CD6FE88CDB8D12EDFB66827FA2");
-
-
 // -----=====| GPG END |=====-----
 
 int main(int argc, char *argv[])
 {
+    QSqlDatabase sdb = QSqlDatabase::addDatabase("QSQLITE");
+    sdb.setDatabaseName(":memory:");
     return 0;
 }

@@ -29,10 +29,10 @@ private:
         QUuid UUID;
         quint32 Number;
         quint32 Total;
-        QByteArray Data;
+        QByteArray *Data;
     };
     QMap<QUuid, quint32> Sizes;
-    QMap<QUuid, QMap<quint32, Chunker::MessageBlock>*> Stack;
+    QMap<QUuid, QMap<quint32, Chunker::MessageBlock*>*> Stack;
     MessageBlock DearmorChunk(QByteArray *Block);
     bool CheckIntegrity(QUuid *UUID, QByteArray *Reconstructed);
 };

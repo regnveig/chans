@@ -27,7 +27,7 @@ Chunker::MessageBlock Chunker::DearmorChunk(QByteArray *Block) {
     QByteArray ClearBlock = (*Block).chopped(sizeof(quint16));
     QByteArray BytesUUID;
     quint16 Checksum;
-    Stream >> BytesUUID >> Result.Number >> Result.Total >> Result.Data >> Checksum;
+    Stream >> BytesUUID >> Result.Number >> Result.Total >> *(Result.Data) >> Checksum;
     Result.UUID = QUuid::fromRfc4122(QByteArrayView(BytesUUID));
     if (Chunker::GetChecksum(&ClearBlock) != Checksum) throw std::runtime_error("Checksums are not equal");
     return Result;
@@ -39,7 +39,7 @@ bool Chunker::CheckIntegrity(QUuid *UUID, QByteArray *Reconstructed) {
     if (this->Stack[*UUID]->size() < Size) return false;
     for (quint32 Counter = 0; Counter < Size; Counter++) {
         if (!(this->Stack[*UUID]->contains(Counter + 1))) return false;
-        (*Reconstructed).append((*(this->Stack[*UUID]))[Counter + 1].Data);
+        Reconstructed->append(*(*(this->Stack[*UUID]))[Counter + 1]->Data);
     }
     return true;
 }
@@ -48,9 +48,10 @@ CHUNKER Chunker::AddBlock(QByteArray *Block, ChunkedMessage *Message) {
     Chunker::MessageBlock DecodedBlock = Chunker::DearmorChunk(Block);
     if (!this->Sizes.contains(DecodedBlock.UUID)) {
         this->Sizes[(QUuid)DecodedBlock.UUID] = (quint32)DecodedBlock.Total;
-        this->Stack[(QUuid)DecodedBlock.UUID] = new QMap<quint32, Chunker::MessageBlock>;
+        this->Stack[(QUuid)DecodedBlock.UUID] = new QMap<quint32, Chunker::MessageBlock*>;
     }
-    (*(this->Stack[DecodedBlock.UUID]))[(quint32)(DecodedBlock.Number)] = Chunker::MessageBlock(DecodedBlock);
+    (*(this->Stack[DecodedBlock.UUID]))[(quint32)(DecodedBlock.Number)] = new Chunker::MessageBlock();
+    *(*(this->Stack[DecodedBlock.UUID]))[(quint32)(DecodedBlock.Number)] = Chunker::MessageBlock(DecodedBlock);
     QByteArray ReconstructedData;
     if (this->CheckIntegrity(&DecodedBlock.UUID, &ReconstructedData)) {
         (*Message).UUID = (QUuid)DecodedBlock.UUID;

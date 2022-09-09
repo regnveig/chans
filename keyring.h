@@ -2,25 +2,29 @@
 #define KEYRING_H
 
 #include <QByteArray>
+#include <QCryptographicHash>
+#include <QDebug>
 #include <QMap>
 #include <gpgme.h>
 #include <secret.h>
 
 class Keyring {
 public:
-    Keyring(gpgme_ctx_t *Context);
+    Keyring();
     ~Keyring();
-    void NewKey(gpgme_ctx_t *Context, QByteArray *Fingerprint);
-    void GetPass(gpgme_ctx_t *Context, QByteArray *Password, QByteArray *Fingerprint);
-    void RemoveKey(QByteArray Fingerprint);
+    void AddKey(QByteArray *Fingerprint);
+    void AddSecret(QByteArray *SecretLine, QByteArray *Alias);
+    void GetSecret(QByteArray *SecretLine, QByteArray *Alias);
 private:
-    QMap<QByteArray, Secret*> Keys;
+    QMap<QByteArray, Secret*> Secrets;
     gpgme_key_t MasterKey;
-    QByteArray Database;
+    QByteArray *Salt;
+    gpgme_ctx_t Context;
     gpgme_error_t Error = GPG_ERR_NO_ERROR;
     QByteArray ShortenFpr(char *Fpr);
+    void SetContext();
     void GenerateSessionID(QByteArray *SessionID);
-    void GenerateSessionKey(gpgme_ctx_t *Context, gpgme_key_t *NewKey, gpgme_key_t *Key);
+    void GenerateSessionKey(gpgme_key_t *NewKey, gpgme_key_t *Key);
 };
 
 #endif // KEYRING_H
