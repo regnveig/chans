@@ -30,7 +30,7 @@ add_executable(chans
   ${TS_FILES}
 )
 target_link_libraries(chans Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Sql)
-target_link_libraries(chans -lgpgme)
+target_link_libraries(chans -lgpgme -lgcrypt)
 
 if(COMMAND qt_create_translation)
     qt_create_translation(QM_FILES ${CMAKE_SOURCE_DIR} ${TS_FILES})

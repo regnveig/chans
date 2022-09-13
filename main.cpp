@@ -11,150 +11,104 @@
 #include <iostream>
 #include <iomanip>
 #include <QtSql>
+#include <gcrypt.h>
 
 //Keyring MainKeyring = Keyring();
+//    QByteArray fpr;
 
-gpgme_error_t ExtPasswordCallBack(void *hook, const char *uid_hint, const char *passphrase_info, int prev_was_bad, int fd) {
-    return 0;
-}
-
+//gpgme_error_t ExtPasswordCallBack(void *hook, const char *uid_hint, const char *passphrase_info, int prev_was_bad, int fd) {
+ //   QByteArray sl;
+  //  MainKeyring.GetSecret(&sl, &fpr);
+   // qDebug() << sl;
+//}
 
 long Hook;
-
-
 
 class GpgObject {
 public:
     GpgObject(const char* Signer) {
         this->SetContext(Signer);
-        this->Keys = new Keyring();
     }
 
     ~GpgObject() {
-        delete this->Keys;
         gpgme_release(this->Context);
     }
-
-
-    void SetPinentry(gpgme_passphrase_cb_t *CallBackFunc) {
-        gpgme_set_passphrase_cb(this->Context, *CallBackFunc, &Hook);
-        gpgme_set_pinentry_mode(this->Context, GPGME_PINENTRY_MODE_LOOPBACK );
-    }
-    gpgme_error_t PasswordCallBack(void *hook, const char *uid_hint, const char *passphrase_info, int prev_was_bad, int fd) {
-        qDebug() << (long)hook;
-        qDebug() << uid_hint;
-        QByteArray PI = passphrase_info;
-        if (PI.length() != 0) {
-            QByteArray Fpt = PI.split(' ')[1];
-        } else {
-            qDebug() << "hohoho";
-            const char * nl = "\n";
-            QTextStream qtin(stdin);
-            const char * pass = qtin.readLine().toLocal8Bit();
-            gpgme_io_writen(fd, pass, strlen(pass));
-            gpgme_io_writen(fd, nl, 1);
-        }
-        qDebug() << prev_was_bad;
-        qDebug() << fd;
-
-        return GPG_ERR_CANCELED;
-    }
-private:
-    gpgme_ctx_t Context;
-    gpgme_error_t Error;
-    Keyring *Keys;
-
-    QByteArray Dearmor(QByteArray* Message) {
-        // GPGME fails to work not in armor mode :c
-        QList List = (*Message).split('\n');
-        List = List.mid(2, List.length() - 5);
-        return QByteArray::fromBase64(List.join());
-    }
-
-    gpgme_error_t GetPublicKey(gpgme_ctx_t* Context, const char* Fingerprint, QByteArray *Key) {
-        gpgme_error_t Error;
+    void GetPublicKey(const char* Fingerprint, QByteArray *Key) {
         gpgme_data_t Keydata;
-        Error = gpgme_data_new(&Keydata);
-        if (Error) return Error;
-        gpgme_key_t KeyObject;
-        Error = gpgme_get_key (*Context, Fingerprint, &KeyObject, 0);
-        if (Error) return Error;
-        gpgme_key_t Keys[2] = { KeyObject, NULL };
-        Error = gpgme_op_export_keys(*Context, Keys, 0, Keydata);
-        if (Error) return Error;
-        QByteArray ArmoredKey = gpgme_data_release_and_get_mem(Keydata, 0);
-        *Key = ""; //DearmorGPG(&ArmoredKey);
-        gpgme_key_release(KeyObject);
-        return GPG_ERR_NO_ERROR;
-    }
-
-
-    void SetContext(const char* Signer) {
-        gpgme_check_version(NULL);
-        this->Error = gpgme_new(&(this->Context));
-        if (this->Error) { this->ExplainError(108); return; }
-        const char* Engine = gpgme_get_dirinfo("gpg-name");
-        const char* HomeDir = gpgme_get_dirinfo("homedir");
-        this->Error = gpgme_ctx_set_engine_info(this->Context, GPGME_PROTOCOL_OPENPGP, Engine, HomeDir);
-        if (this->Error) { this->ExplainError(109); return; }
-        gpgme_set_armor(this->Context, 1);
-        gpgme_set_offline(this->Context, 1);
-        gpgme_signers_clear(this->Context);
-        gpgme_key_t KeyObject;
-        this->Error = gpgme_get_key(this->Context, Signer, &KeyObject, 0);
-        if (this->Error) { this->ExplainError(110); return; }
-        this->Error = gpgme_signers_add(this->Context, KeyObject);
-        if (this->Error) { this->ExplainError(111); return; }
-
-    }
-
-    void ExplainError(quint16 Operation) {
-        const char * ErrorExplanation = gpgme_strerror(this->Error);
-        qDebug() << "[ERROR] GPGME Error:" << this->Error << ErrorExplanation << "|" << "Operation:" << Operation;
-    }
-    void EncryptAndSign(const char* Fingerprint, QByteArray *Message, QByteArray *Cipher) {
-        gpgme_data_t PlainData;
-        gpgme_data_t CipherData;
-        this->Error = gpgme_data_new(&CipherData);
-        if (this->Error) { this->ExplainError(106); return; }
-        this->Error = gpgme_data_new_from_mem(&PlainData, (*Message).constData(), (*Message).length(), 1);
-        if (this->Error) { this->ExplainError(106); return; }
+        this->Error = gpgme_data_new(&Keydata);
+        if (this->Error) return;
         gpgme_key_t KeyObject;
         this->Error = gpgme_get_key(this->Context, Fingerprint, &KeyObject, 0);
-        if (this->Error) { this->ExplainError(106); return; }
+        if (this->Error) return;
         gpgme_key_t Keys[2] = { KeyObject, NULL };
-        this->Error = gpgme_op_encrypt_sign(this->Context, Keys, GPGME_ENCRYPT_ALWAYS_TRUST, PlainData, CipherData);
-        if (this->Error) { this->ExplainError(106); return; }
+        this->Error = gpgme_op_export_keys(this->Context, Keys, 0, Keydata);
+        if (this->Error) return;
+        QByteArray ArmoredKey = gpgme_data_release_and_get_mem(Keydata, 0);
+        *Key = Secret::Dearmor(&ArmoredKey);
+        gpgme_key_release(KeyObject);
+    }
+    void EncryptAndSign(const char* Fingerprint, QByteArray *Message, QByteArray *Cipher) {
+        gpgme_data_t PlainData, CipherData;
+        this->Error("1",   gpgme_data_new(&CipherData));
+        this->Error("2",   gpgme_data_new_from_mem(&PlainData, Message->constData(), Message->length(), 1));
+        gpgme_key_t KeyObject;
+        this->Error("3",   gpgme_get_key(this->Context, Fingerprint, &KeyObject, 0));
+        gpgme_key_t Keys[2] = { KeyObject, NULL };
+        this->Error("4",   gpgme_op_encrypt_sign(this->Context, Keys, GPGME_ENCRYPT_ALWAYS_TRUST, PlainData, CipherData));
         QByteArray ArmoredCipher = gpgme_data_release_and_get_mem(CipherData, 0);
-        *Cipher = Dearmor(&ArmoredCipher);
+        *Cipher = Secret::Dearmor(&ArmoredCipher);
         gpgme_data_release(PlainData);
         gpgme_key_release(KeyObject);
     }
 
     void DecryptAndVerify(QByteArray *Cipher, QByteArray *Message, gpgme_signature_t *Signature) {
-        gpgme_data_t PlainData;
-        gpgme_data_t CipherData;
-        this->Error = gpgme_data_new(&PlainData);
-        if (this->Error) { this->ExplainError(106); return; }
-        this->Error = gpgme_data_new_from_mem(&CipherData, (*Cipher).constData(), (*Cipher).length(), 1);
-        if (this->Error) { this->ExplainError(106); return; }
-        this->Error = gpgme_op_decrypt_verify(this->Context, CipherData, PlainData);
-        if (this->Error) { this->ExplainError(106); return; }
+        gpgme_data_t PlainData, CipherData;
+        this->Error("1",   gpgme_data_new(&PlainData));
+        this->Error("2",   gpgme_data_new_from_mem(&CipherData, Cipher->constData(), Cipher->length(), 1));
+        this->Error("3",   gpgme_op_decrypt_verify(this->Context, CipherData, PlainData));
         *Message = gpgme_data_release_and_get_mem(PlainData, 0);
-        if (this->Error) { this->ExplainError(106); return; }
         gpgme_verify_result_t Result = gpgme_op_verify_result(this->Context);
         *Signature = Result->signatures;
         gpgme_data_release(CipherData);
     }
+private:
+    gpgme_ctx_t Context;
+    void Error(const char *stage, gpgme_error_t err) {
+        if (err) throw std::runtime_error((QString(stage) + ": " + QString(gpgme_strerror(err))).toLocal8Bit());
+    };
+
+
+
+    void SetContext(const char* Signer) {
+        gpgme_check_version(NULL);
+        this->Error = gpgme_new(&this->Context);
+        if (this->Error) return;
+        const char* Engine = gpgme_get_dirinfo("gpg-name");
+        const char* HomeDir = gpgme_get_dirinfo("homedir");
+        this->Error = gpgme_ctx_set_engine_info(this->Context, GPGME_PROTOCOL_OPENPGP, Engine, HomeDir);
+        if (this->Error) return;
+        gpgme_set_armor(this->Context, 1);
+        gpgme_set_offline(this->Context, 1);
+        gpgme_signers_clear(this->Context);
+        gpgme_key_t KeyObject;
+        this->Error = gpgme_get_key(this->Context, Signer, &KeyObject, 0);
+        if (this->Error) return;
+        this->Error = gpgme_signers_add(this->Context, KeyObject);
+        if (this->Error) return;
+        //gpgme_set_passphrase_cb(this->Context, ExtPasswordCallBack, &Hook);
+        //gpgme_set_pinentry_mode(this->Context, GPGME_PINENTRY_MODE_LOOPBACK);
+    }
+
+
 
 
 };
 
 // -----=====| GPG END |=====-----
 
-int main(int argc, char *argv[])
-{
-    QSqlDatabase sdb = QSqlDatabase::addDatabase("QSQLITE");
-    sdb.setDatabaseName(":memory:");
+int main(int argc, char *argv[]) {
+    char * buf;
+    buf = (char*)gcry_random_bytes_secure(129, GCRY_STRONG_RANDOM);
+    qDebug() << QByteArray(buf, 96).toBase64();
     return 0;
 }

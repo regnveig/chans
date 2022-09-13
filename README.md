@@ -2,6 +2,7 @@
 
 ![Qt](https://img.shields.io/badge/qt-6.3.1-brightgreen?style=flat-square&logo=qt&logoColor=white)
 ![gpgme](https://img.shields.io/badge/gpgme-1.18.0-brightgreen?style=flat-square&logo=gnuprivacyguard&logoColor=white)
+![libgcrypt](https://img.shields.io/badge/libgcrypt-1.10.1-brightgreen?style=flat-square&logo=gnuprivacyguard&logoColor=white)
 ![GitHub](https://img.shields.io/github/license/regnveig/chans?style=flat-square)
 
 ## Description

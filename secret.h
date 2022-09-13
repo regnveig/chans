@@ -3,21 +3,20 @@
 
 #include <QByteArray>
 #include <QDebug>
-#include <QUuid>
 #include <gpgme.h>
+#include <gcrypt.h>
 
 class Secret {
 public:
     Secret(gpgme_ctx_t *Context, QByteArray *Data, gpgme_key_t *Key);
-    void Reveal(gpgme_ctx_t *Context, QByteArray *Data);
-    gpgme_error_t ShowError();
     ~Secret();
+    void Reveal(gpgme_ctx_t *Context, QByteArray *Data);
     static QByteArray Dearmor(QByteArray *Message);
 private:
     QByteArray *EncryptedData;
-    size_t DataLength;
-    gpgme_error_t Error = GPG_ERR_NO_ERROR;
-    quint16 Stage = 0;
+    size_t *DataLength;
+    void Error(int Stage, gpgme_error_t Errno);
+
 };
 
 #endif // SECRET_H
